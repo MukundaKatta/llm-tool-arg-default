@@ -251,6 +251,35 @@ def test_fill_defaults_keeps_explicit_none_by_default():
     assert result.args["units"] is None
 
 
+def test_fill_none_keeps_none_when_no_default_declared():
+    # explicit None with no declared default must NOT vanish - there is
+    # nothing to fill it with, so the key is preserved.
+    raw = {"units": None}
+    schema = {"units": {"type": "string"}}  # no default
+    result = fill_defaults_safe(raw, schema, fill_none_with_default=True)
+    assert "units" in result.args
+    assert result.args["units"] is None
+
+
+def test_fill_none_keeps_none_when_default_is_absent_sentinel():
+    raw = {"user_id": None}
+    schema = {"user_id": {"type": "string", "default": Default.absent}}
+    result = fill_defaults_safe(raw, schema, fill_none_with_default=True)
+    assert "user_id" in result.args
+    assert result.args["user_id"] is None
+
+
+def test_fill_none_strips_only_keys_with_fillable_default():
+    raw = {"a": None, "b": None}
+    schema = {
+        "a": {"type": "string", "default": "x"},  # fillable
+        "b": {"type": "string"},  # no default
+    }
+    result = fill_defaults_safe(raw, schema, fill_none_with_default=True)
+    assert result.args["a"] == "x"
+    assert result.args["b"] is None
+
+
 # ---------- inspect_schema ----------
 
 

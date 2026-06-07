@@ -184,6 +184,11 @@ def fill_defaults_safe(
     those explicit None entries are treated the same as missing and get
     replaced by the schema default if one exists.
 
+    An explicit None is only stripped when the schema declares a usable
+    (non-``Default.absent``) default for that key; otherwise there is
+    nothing to fill it with, so the None is preserved rather than silently
+    dropped.
+
     When ``fill_none_with_default=False`` the behavior matches
     `fill_defaults` exactly.
     """
@@ -192,8 +197,15 @@ def fill_defaults_safe(
 
     properties = _normalize_schema(schema)
 
-    # treat explicit-None as missing by stripping those keys first
-    stripped = {k: v for k, v in raw.items() if v is not None or k not in properties}
+    def _has_fillable_default(key: str) -> bool:
+        prop_schema = properties.get(key)
+        if not isinstance(prop_schema, dict):
+            return False
+        return prop_schema.get("default", Default.absent) is not Default.absent
+
+    # treat explicit-None as missing, but only strip keys we can actually
+    # refill from a declared default - otherwise keep the None as-is
+    stripped = {k: v for k, v in raw.items() if v is not None or not _has_fillable_default(k)}
     return fill_defaults(stripped, schema)
 
 
