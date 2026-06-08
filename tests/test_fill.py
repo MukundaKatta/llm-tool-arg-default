@@ -331,3 +331,58 @@ def test_invalid_schema_type_raises():
 
     with pytest.raises(TypeError):
         fill_defaults({}, "not a schema")  # type: ignore[arg-type]
+
+
+# ---------- mutable-default isolation (no shared-state leak) ----------
+
+
+def test_mutable_list_default_is_not_shared_across_calls():
+    schema = {"opts": {"default": []}}
+    r1 = fill_defaults({}, schema)
+    r1.args["opts"].append("x")
+    r2 = fill_defaults({}, schema)
+    # the schema default must be untouched by the first call's mutation
+    assert r2.args["opts"] == []
+    assert schema["opts"]["default"] == []
+
+
+def test_mutable_dict_default_is_not_shared_across_calls():
+    schema = {"opts": {"default": {}}}
+    r1 = fill_defaults({}, schema)
+    r1.args["opts"]["k"] = "v"
+    r2 = fill_defaults({}, schema)
+    assert r2.args["opts"] == {}
+    assert schema["opts"]["default"] == {}
+
+
+def test_nested_mutable_default_is_not_shared_across_calls():
+    schema = {
+        "config": {
+            "type": "object",
+            "properties": {"tags": {"default": []}},
+        }
+    }
+    r1 = fill_defaults({"config": {}}, schema)
+    r1.args["config"]["tags"].append("y")
+    r2 = fill_defaults({"config": {}}, schema)
+    assert r2.args["config"]["tags"] == []
+
+
+def test_signature_mutable_default_is_not_shared_across_calls():
+    # a callable whose default is a fresh mutable; signature defaults are
+    # pulled by identity, so the fill must copy them rather than alias.
+    def g(items=[]):  # noqa: B006, ANN001
+        return None
+
+    r1 = fill_defaults({}, g)
+    r1.args["items"].append(1)
+    r2 = fill_defaults({}, g)
+    assert r2.args["items"] == []
+
+
+def test_safe_variant_mutable_default_is_not_shared_across_calls():
+    schema = {"opts": {"default": {}}}
+    r1 = fill_defaults_safe({}, schema)
+    r1.args["opts"]["k"] = "v"
+    r2 = fill_defaults_safe({}, schema)
+    assert r2.args["opts"] == {}

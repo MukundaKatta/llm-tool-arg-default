@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -162,7 +163,11 @@ def fill_defaults(
             if default is Default.absent:
                 # explicit "no default" sentinel - leave key missing
                 continue
-            out[key] = default
+            # deep-copy so a mutable default (e.g. [] or {}) declared in the
+            # schema is never aliased into the result; otherwise mutating one
+            # call's filled value would corrupt the default for every later
+            # call (the classic mutable-default footgun).
+            out[key] = copy.deepcopy(default)
             filled.append(key)
         else:
             # value present - recurse into nested defaults if applicable
